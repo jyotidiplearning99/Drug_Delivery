@@ -1,0 +1,8 @@
+{
+  "test_mae_mean": 0.11593588399297956,
+  "test_mae_std": 0.022879551224037238,
+  "valid_mae_mean": 0.1244177521507597,
+  "valid_mae_std": 0.00608726077472318,
+  "total_time_minutes": 2.87403244972229,
+  "total_time_hours": 0.04790054082870483
+}

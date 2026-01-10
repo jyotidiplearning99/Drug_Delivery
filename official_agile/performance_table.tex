@@ -1,0 +1,18 @@
+
+\begin{table}[h]
+\centering
+\caption{Performance Comparison: Stacked Ensemble vs Nature Communications 2024 AGILE}
+\begin{tabular}{lcccc}
+\hline
+\textbf{Method} & \textbf{Correlation} & \textbf{RMSE} & \textbf{Architecture} & \textbf{Improvement} \\
+\hline
+\textbf{Stacked Ensemble (Ours)} & \textbf{0.8110} & \textbf{1.940} & Ridge+GB+RF+XGB+ET+EN & \textbf{Baseline} \\
+Nature Paper GIN & 0.573 & - & Graph Neural Network & -41.5\% \\
+Ridge (Polynomial) & 0.749 & 2.021 & Linear Regression & -8.2\% \\
+Gradient Boosting & 0.706 & 2.168 & Tree Ensemble & -14.9\% \\
+Random Forest & 0.760 & - & Tree Ensemble & -6.7\% \\
+XGBoost & 0.757 & - & Gradient Boosting & -7.0\% \\
+ElasticNet & 0.621 & 2.347 & Linear Regression & -30.5\% \\
+\hline
+\end{tabular}
+\end{table}

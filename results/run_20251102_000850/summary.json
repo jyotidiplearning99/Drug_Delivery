@@ -1,0 +1,16 @@
+{
+  "test_mae": 0.2888664772913522,
+  "valid_mae": 0.357783821005511,
+  "best_model_params": {
+    "subsample": 0.6,
+    "reg_lambda": 0,
+    "reg_alpha": 0.005,
+    "num_leaves": 32,
+    "n_estimators": 400,
+    "min_child_weight": 0.01,
+    "min_child_samples": 20,
+    "learning_rate": 0.001,
+    "boosting_type": "dart"
+  },
+  "total_time_minutes": 0.07637599706649781
+}

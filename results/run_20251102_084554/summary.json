@@ -1,0 +1,20 @@
+{
+  "test_mae_mean": 0.12036649794590026,
+  "test_mae_std": 0.019006126502204866,
+  "test_mae_percent": 12.036649794590026,
+  "valid_mae_mean": 0.1250575574138751,
+  "valid_mae_std": 0.006779038334450984,
+  "best_model_params": {
+    "subsample": 0.6,
+    "reg_lambda": 0.005,
+    "reg_alpha": 0.005,
+    "num_leaves": 32,
+    "n_estimators": 300,
+    "min_child_weight": 1.0,
+    "min_child_samples": 100,
+    "learning_rate": 0.1,
+    "boosting_type": "dart"
+  },
+  "total_time_minutes": 2.924594533443451,
+  "total_time_hours": 0.048743242224057515
+}

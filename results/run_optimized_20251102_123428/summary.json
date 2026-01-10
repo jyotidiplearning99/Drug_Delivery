@@ -1,0 +1,25 @@
+{
+  "test_mae_mean": 0.11892378433937331,
+  "test_mae_std": 0.01899219575625636,
+  "test_mae_min": 0.08962330836879619,
+  "test_mae_max": 0.1451116414388412,
+  "test_mae_percent": 11.892378433937331,
+  "valid_mae_mean": 0.12621880036611696,
+  "valid_mae_std": 0.0059892584617743695,
+  "best_model_params": {
+    "subsample": 0.6,
+    "reg_lambda": 0.01,
+    "reg_alpha": 0,
+    "num_leaves": 64,
+    "n_estimators": 700,
+    "min_child_weight": 0.5,
+    "min_child_samples": 50,
+    "max_depth": 8,
+    "learning_rate": 0.03,
+    "colsample_bytree": 0.9,
+    "boosting_type": "dart"
+  },
+  "total_time_minutes": 25.620804818471274,
+  "num_features": 17,
+  "n_iter_hyperparameters": 300
+}

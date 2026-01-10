@@ -1,0 +1,19 @@
+{
+  "test_mae_mean": 0.11699884178193116,
+  "test_mae_std": 0.01060088236899509,
+  "valid_mae_mean": 0.1257066368238376,
+  "valid_mae_std": 0.006047243155561454,
+  "best_model_params": {
+    "subsample": 0.4,
+    "reg_lambda": 0.015,
+    "reg_alpha": 0.01,
+    "num_leaves": 16,
+    "n_estimators": 150,
+    "min_child_weight": 1.0,
+    "min_child_samples": 2,
+    "learning_rate": 0.1,
+    "boosting_type": "gbdt"
+  },
+  "total_time_minutes": 2.680716609954834,
+  "total_time_hours": 0.0446786101659139
+}
