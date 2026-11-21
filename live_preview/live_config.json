@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-11-21T10:10:33.382940+00:00",
+  "intended_use": "exploratory research testing only",
+  "training_formulations": 301,
+  "numeric_stats": {
+    "Drug_MW": {
+      "min": 130.078,
+      "max": 1488.807,
+      "median": 392.467
+    },
+    "Drug_TPSA": {
+      "min": 6.48,
+      "max": 701.77,
+      "median": 88.54
+    },
+    "Number_of_Heteroatoms": {
+      "min": 2.0,
+      "max": 41.0,
+      "median": 6.0
+    },
+    "Drug_LogP": {
+      "min": -11.5452,
+      "max": 9.11352,
+      "median": 2.7597
+    },
+    "Polymer_MW": {
+      "min": 2.3,
+      "max": 215.0,
+      "median": 34.0
+    },
+    "LA_GA": {
+      "min": 1.0,
+      "max": 5.67,
+      "median": 1.0
+    },
+    "Initial_Drug_to_Polymer_Ratio": {
+      "min": 0.0005,
+      "max": 1.01619121,
+      "median": 0.2
+    },
+    "Particle_Size": {
+      "min": 1.153,
+      "max": 295.7,
+      "median": 33.35
+    },
+    "Drug_Loading_Capacity": {
+      "min": 0.000221782,
+      "max": 0.429,
+      "median": 0.094809061
+    },
+    "Drug_Encapsulation_Efficiency": {
+      "min": 1.31,
+      "max": 100.0,
+      "median": 71.8
+    },
+    "Surfactant_Percent": {
+      "min": 0.0,
+      "max": 30.0,
+      "median": 0.0
+    }
+  },
+  "drug_names": [
+    "2-methoxyestradiol",
+    "4-methoxy chalcone",
+    "5-fluorouracil",
+    "abt627",
+    "apomorphine hydrochloride",
+    "asenapine maleate",
+    "budesonide",
+    "caffeine",
+    "camptothecin",
+    "cannabidiol",
+    "cefazolin sodium",
+    "celecoxib",
+    "clarithromycin",
+    "clonidine hydrochloride",
+    "clotrimazole",
+    "dexamethasone",
+    "diprophylline",
+    "dipyridamole",
+    "donepezil hcl",
+    "doxycycline hcl",
+    "doxycycline hyclate",
+    "erythromycin",
+    "etoposide",
+    "fenofibric acid",
+    "fenretinide",
+    "fentanyl",
+    "fluorofenidone",
+    "ganciclovir",
+    "gentamicin sulphate",
+    "glycyrrhetinic acid",
+    "goserelin acetate",
+    "guanosine",
+    "hydrocortisone",
+    "ibuprofen",
+    "imatinib mesylate",
+    "indomethacin",
+    "ipriflavone",
+    "ivacaftor",
+    "ketorolac tromethamine",
+    "levonorgestrel",
+    "lidocaine",
+    "lopinavir",
+    "lornoxicam",
+    "losartan potassium",
+    "methylprednisolone",
+    "minoxidil",
+    "mitoxantrone dihydrochloride",
+    "moxidectin",
+    "naloxone hydrochloride",
+    "naltrexone",
+    "naproxen sodium",
+    "nifedipine",
+    "olanzapine (2-methyl-4-(4-methyl- 1-piperazinyl)-10h thieno[2,3][1,5]benzodiazepine)",
+    "paclitaxel",
+    "paliperidone palmitate",
+    "palonosetron",
+    "palonosetron hydrochlorid",
+    "pd98059",
+    "prednisolone",
+    "prednisone hydrochloride",
+    "prilocaine",
+    "prodigiosin",
+    "progesterone",
+    "propanolol hydrochloride",
+    "rapamycin",
+    "rasagiline mesylate",
+    "regorafenib",
+    "rhodamine-b",
+    "rifampicin",
+    "rifapentine",
+    "risperidone",
+    "ritonavir",
+    "rivastigmine base",
+    "ropivacaine mesilate",
+    "rotenone",
+    "simvastatin",
+    "sunitinib malate",
+    "temozolomide",
+    "tenofovir alafenamide fumarate",
+    "thioridazine hydrochloride",
+    "trimethoprim",
+    "triptolide",
+    "vancomycin",
+    "\u03b2-methasone"
+  ],
+  "methods": [
+    "O/W",
+    "S/O/W",
+    "S/W/O/W",
+    "W/O/W"
+  ],
+  "demo_profile_training_example": {
+    "Drug_MW": 639.83,
+    "Drug_TPSA": 116.04,
+    "Number_of_Heteroatoms": 9.0,
+    "Drug_LogP": 5.7289,
+    "Polymer_MW": 75.0,
+    "LA_GA": 3.0,
+    "Initial_Drug_to_Polymer_Ratio": 0.666666667,
+    "Particle_Size": 47.723,
+    "Drug_Loading_Capacity": 0.3541,
+    "Drug_Encapsulation_Efficiency": 88.3,
+    "Surfactant_Percent": 0.5,
+    "Drug_Name": "moxidectin",
+    "Formulation_Method": "O/W"
+  },
+  "development_cv": {
+    "baseline_pooled_mae": 0.2036450254013148,
+    "combined_pooled_mae": 0.1932609538200199,
+    "source": "Repeatedly inspected publication-grouped development CV on 301 source-linked formulations"
+  },
+  "artifact_sha256": {
+    "models/descriptor_only/model.cbm": "5284be29a0a3bf3b07cfeaa64c0b70c8bbcce8bcb5fbfabc526638769b3fffd3",
+    "models/descriptor_only/metadata.json": "497eb7e0813b6f4fa15c023391e8eb8985716189f19c624dd66c72986b922770",
+    "models/combined_v1/model.cbm": "342afa4da0580ff25b758b5264c8388afe8c855207427b38bba9030a7a6a171b",
+    "models/combined_v1/metadata.json": "6a375897c4c5961488b60ea7fcba60f10e480458645c72f147b38d6f14fb12a6"
+  },
+  "training_source": "Bao-matched PLGA dataset; original training data not included in public package"
+}

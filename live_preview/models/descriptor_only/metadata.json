@@ -1,0 +1,50 @@
+{
+  "status": "full-development-data fit, not an independently validated deployed model",
+  "created_at_utc": "2026-11-21T09:41:46.336821+00:00",
+  "dataset": "301 strong Bao-linked formulations, release Time > 1 day",
+  "training_rows": 3903,
+  "training_formulations": 301,
+  "training_publications": 106,
+  "time_min": 1.000021344,
+  "time_max": 237.7322835,
+  "target": "Release fraction, projected/clipped to [0,1] at inference",
+  "inference_constraint": "isotonic per-formulation over a fixed prediction time grid",
+  "selection_cv_reference": "results/model_improvement/metadata_v1/summary.csv",
+  "selection_warning": "CV comparisons reused study splits repeatedly; do not quote training fit as independent test accuracy",
+  "model_config": {
+    "iterations": 600,
+    "depth": 6,
+    "learning_rate": 0.03,
+    "l2_leaf_reg": 5,
+    "loss_function": "MAE",
+    "random_seed": 42,
+    "thread_count": 8
+  },
+  "source_sha256": {
+    "external_sources/bao_2025/mp_dataset_initial_formulation.xlsx": "033f01949670afde2aae6d8bdf886b41f6f962170e5d2e5ddf07c520edd51169",
+    "results/data_integrity/bao_provenance_manifest.csv": "c4b0c4d7846b5a1ea8577e0e89ba2c1b85fd79af410513189d10c8fa0c41efdb",
+    "original_repository/outputs_v2_concise/data/standardized_df.pkl": "35e4f9178d02167f6e791e1197aad855dc819d5a5582e3c38a23275e31249a30",
+    "results/study_validation/predictions.csv": "cb409056108f6f6e8059bb5251ac9c8b8afed91c8fd152130095a49a2f3a5b13",
+    "experiments/model_improvement/study_metadata_ablation.py": "fdf7cf91a143af2bc1153bdac5ef1f7f18d650988a8f4a613bd6edb11970f211"
+  },
+  "python_version": "3.9.25 (main, Oct 14 2026, 00:00:00) \n[GCC 11.5.0 20240719 (Red Hat 11.5.0-14)]",
+  "catboost_version": "1.2.10",
+  "pandas_version": "2.2.2",
+  "sklearn_version": "1.4.2",
+  "model_variant": "descriptor_only",
+  "feature_order": [
+    "Drug_MW",
+    "Drug_TPSA",
+    "Number_of_Heteroatoms",
+    "Drug_LogP",
+    "Polymer_MW",
+    "LA_GA",
+    "Initial_Drug_to_Polymer_Ratio",
+    "Particle_Size",
+    "Drug_Loading_Capacity",
+    "Drug_Encapsulation_Efficiency",
+    "Surfactant_Percent",
+    "Time"
+  ],
+  "categorical_features": []
+}
