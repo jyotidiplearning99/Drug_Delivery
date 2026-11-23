@@ -127,36 +127,82 @@ def run_and_show(descriptors: pd.DataFrame, early_by_id: dict | None=None,
 tab1,tab2,tab3=st.tabs(['🧬 Compare custom formulations','📈 Explore published release profiles','ℹ️ Model & dataset'])
 
 with tab1:
-    st.subheader('Compare multiple formulation parameter sets')
-    st.write('Edit the rows or upload your own CSV. Every row produces a separate predicted release curve on the same chart.')
-    # Defaults copied from actual published Bao formulation descriptor rows; not synthetic observations.
-    defaults=(data.drop_duplicates('formulation_id')
-              .dropna(subset=FEATURES)
-              .head(3)[FEATURES].reset_index(drop=True))
+    st.subheader('Compare your own PLGA formulations')
+    st.caption('Enter parameters directly as individual numeric fields, just like the existing PLGA Studio. Each formulation produces its own release curve on the shared graph.')
+
+    # Every starting value comes from a published Bao descriptor row, and remains editable.
+    seed_rows=(data.drop_duplicates('formulation_id')
+               .dropna(subset=FEATURES)
+               .reset_index(drop=True))
+    defaults=seed_rows.head(3)[FEATURES].copy().reset_index(drop=True)
     defaults.insert(0,'formulation_id',[f'Formulation {i+1}' for i in range(len(defaults))])
     template=defaults.head(0).copy()
-    up=st.file_uploader('Optional: upload parameter sets CSV',type=['csv'],key='custom_parameters')
-    if up is not None:
-        try:
-            param_rows=pd.read_csv(up)
-        except Exception as exc:
-            st.error(f'Could not read parameter CSV: {exc}')
-            param_rows=defaults
+
+    entry_mode=st.radio('How would you like to enter your formulations?',
+                        options=['Manual parameter fields', 'Spreadsheet / CSV (advanced)'],
+                        horizontal=True, key='bao_entry_mode')
+
+    if entry_mode == 'Manual parameter fields':
+        count=int(st.number_input('Number of formulations to compare',
+                                  min_value=1, max_value=25, value=2, step=1,
+                                  help='Choose up to 25 parameter sets; each becomes a separate predicted curve.'))
+        st.caption('Change any number below. All 10 model input parameters are editable, with units shown in the labels. Expand each formulation to edit it.')
+        groups=[
+            ('Drug properties', ['drug_mw','drug_logp','drug_tpsa']),
+            ('Polymer properties', ['polymer_mw_kda','la_ga_pct']),
+            ('Formulation properties', ['drug_polymer_ratio','particle_size_um',
+                                        'drug_loading_pct','encapsulation_efficiency_pct',
+                                        'solubility_enhancer_conc_pct']),
+        ]
+        manual_records=[]
+        for i in range(count):
+            seed=seed_rows.iloc[i % len(seed_rows)]
+            with st.expander(f'Formulation {i+1} — editable parameters', expanded=(i < 2)):
+                name=st.text_input('Formulation name / ID', value=f'Formulation {i+1}',
+                                   key=f'bao_manual_formulation_name_{i}')
+                record={'formulation_id':name}
+                for group_name, fields in groups:
+                    st.markdown('**'+group_name+'**')
+                    cols=st.columns(3)
+                    for j, feature in enumerate(fields):
+                        with cols[j % 3]:
+                            record[feature]=float(st.number_input(
+                                LABELS[feature], value=float(seed[feature]), step=0.1,
+                                format='%.4f', key=f'bao_manual_{i}_{feature}'))
+                manual_records.append(record)
+        edited=pd.DataFrame(manual_records, columns=['formulation_id']+FEATURES)
+        st.caption('These are editable demonstration inputs, not recommendations. Values outside the model training ranges trigger a warning below.')
     else:
-        param_rows=defaults
-    st.download_button('Download blank input CSV template',template.to_csv(index=False).encode('utf8'),
-                       file_name='bao_lightgbm_input_template.csv',mime='text/csv')
-    edited=st.data_editor(param_rows, num_rows='dynamic', use_container_width=True,hide_index=True,
-                          column_config={
-                              'formulation_id':st.column_config.TextColumn('Formulation name / ID'),
-                              **{f:st.column_config.NumberColumn(LABELS[f], format='%.4f') for f in FEATURES}
-                          },key='parameter_editor')
-    with st.expander('Optional: supply **measured** first-day release points for each formulation'):
-        st.caption('Enter observed measurements only—not predicted or invented values. You need at least two distinct timepoints within day 0–1 for a formulation to use the first-day-assisted model. Leave empty for descriptor-only prediction.')
+        st.write('Edit the table directly or upload your own parameter sets. One row gives one predicted curve.')
+        up=st.file_uploader('Optional: upload parameter sets CSV', type=['csv'],
+                            key='custom_parameters')
+        if up is not None:
+            try:
+                param_rows=pd.read_csv(up)
+            except Exception as exc:
+                st.error(f'Could not read parameter CSV: {exc}')
+                param_rows=defaults
+        else:
+            param_rows=defaults
+        st.download_button('Download blank input CSV template',
+                           template.to_csv(index=False).encode('utf8'),
+                           file_name='bao_lightgbm_input_template.csv', mime='text/csv')
+        edited=st.data_editor(param_rows, num_rows='dynamic', use_container_width=True,
+                              hide_index=True,
+                              column_config={
+                                  'formulation_id':st.column_config.TextColumn('Formulation name / ID'),
+                                  **{f:st.column_config.NumberColumn(LABELS[f], format='%.4f')
+                                     for f in FEATURES}
+                              }, key='parameter_editor')
+
+    with st.expander('Optional: add measured first-day release points for assisted prediction'):
+        st.caption('Use actual laboratory measurements only. At least two distinct measurement times between day 0 and day 1 are required. Leave empty for descriptor-only LightGBM prediction.')
         early_blank=pd.DataFrame(columns=['formulation_id','time_days','release_percent'])
-        early_edit=st.data_editor(early_blank, num_rows='dynamic', use_container_width=True,
-                                   hide_index=True,key='early_editor')
-        st.download_button('Download early-measurement CSV template',early_blank.to_csv(index=False).encode('utf8'),
+        early_edit=st.data_editor(early_blank, num_rows='dynamic',
+                                  use_container_width=True, hide_index=True,
+                                  key='early_editor')
+        st.download_button('Download early-measurement CSV template',
+                           early_blank.to_csv(index=False).encode('utf8'),
                            'bao_first_day_measurements_template.csv','text/csv')
     try:
         cleaned=edited.dropna(subset=['formulation_id']).copy()
@@ -166,10 +212,11 @@ with tab1:
             early_map={str(k):v for k,v in early_clean.groupby('formulation_id')}
             unused=set(early_map)-set(cleaned.formulation_id.astype(str))
             if unused:
-                st.warning('First-day measurements for unidentified formulations were not used: '+', '.join(sorted(unused)))
-        run_and_show(cleaned,early_by_id=early_map)
+                st.warning('First-day measurements for unidentified formulations were not used: '
+                           + ', '.join(sorted(unused)))
+        run_and_show(cleaned, early_by_id=early_map)
     except Exception as exc:
-        st.error(f'Please correct the input table: {exc}')
+        st.error(f'Please correct the input parameters: {exc}')
 
 with tab2:
     st.subheader('Compare measured Bao profiles and model forecasts')
