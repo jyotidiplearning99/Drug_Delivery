@@ -1,0 +1,37 @@
+{
+  "algorithm": "LightGBM descriptor-only, no first-day data",
+  "source": "Bao Mendeley Data v2, 10.17632/zzvtdrcy76.2",
+  "source_sha256": "6b7ccaf8a3ed0074ab0f3be66202570fb1e5c242e5bf8520e3bca1bba783b145",
+  "n_source_profiles": 321,
+  "n_training_profiles": 316,
+  "n_training_release_rows_later_than_day1": 4078,
+  "excluded_large_cumulative_release_drop_profile_ids": [
+    "77",
+    "78",
+    "79",
+    "124",
+    "267"
+  ],
+  "excluded_profile_count": 5,
+  "cv_folds": 5,
+  "cv_grouping": "formulation_id, no publication holdout",
+  "cv_raw_clipped_mae": 0.15551181540915546,
+  "cv_raw_clipped_rmse": 0.21413731265354768,
+  "cv_monotone_projected_mae": 0.15530927715049045,
+  "cv_monotone_projected_rmse": 0.21391305280592252,
+  "features": [
+    "drug_mw",
+    "drug_logp",
+    "drug_tpsa",
+    "polymer_mw_kda",
+    "la_ga_pct",
+    "drug_polymer_ratio",
+    "particle_size_um",
+    "drug_loading_pct",
+    "encapsulation_efficiency_pct",
+    "solubility_enhancer_conc_pct",
+    "time_days"
+  ],
+  "hyperparameters": "240 iterations, learning_rate 0.04, 15 leaves, min_child_samples 8, reg_lambda 1.0, seed 42",
+  "limitations": "formulation CV only; development data; can share drug/source across folds; not independent external evaluation"
+}

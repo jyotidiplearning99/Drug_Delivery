@@ -1,0 +1,214 @@
+{
+  "source": "Bao et al. Mendeley Data v2",
+  "doi": "10.17632/zzvtdrcy76.2",
+  "license": "CC BY 4.0",
+  "original_workbook_sha256": "34feff9871eeead6b29dda957ec3dc0e65661dbc204b156b3826ce4e39a9e22b",
+  "normalized_source_sha256": "6b7ccaf8a3ed0074ab0f3be66202570fb1e5c242e5bf8520e3bca1bba783b145",
+  "n_all_formulations": 321,
+  "n_all_measurements": 4913,
+  "n_eligible_formulations": 212,
+  "n_future_measurements": 2704,
+  "n_excluded_formulations": 109,
+  "descriptor_features": [
+    "drug_mw",
+    "drug_logp",
+    "drug_tpsa",
+    "polymer_mw_kda",
+    "la_ga_pct",
+    "drug_polymer_ratio",
+    "particle_size_um",
+    "drug_loading_pct",
+    "encapsulation_efficiency_pct",
+    "solubility_enhancer_conc_pct",
+    "time_days"
+  ],
+  "assisted_features": [
+    "drug_mw",
+    "drug_logp",
+    "drug_tpsa",
+    "polymer_mw_kda",
+    "la_ga_pct",
+    "drug_polymer_ratio",
+    "particle_size_um",
+    "drug_loading_pct",
+    "encapsulation_efficiency_pct",
+    "solubility_enhancer_conc_pct",
+    "kp_k",
+    "kp_n",
+    "kp_r2",
+    "weibull_alpha",
+    "weibull_beta",
+    "weibull_r2",
+    "release_0_25d",
+    "release_0_5d",
+    "release_1d",
+    "early_release_last",
+    "early_time_last",
+    "time_days"
+  ],
+  "training_numeric_ranges": {
+    "drug_mw": [
+      130.078,
+      1488.807000000001
+    ],
+    "drug_logp": [
+      -11.54519999999993,
+      9.113520000000005
+    ],
+    "drug_tpsa": [
+      6.48,
+      701.7700000000002
+    ],
+    "polymer_mw_kda": [
+      2.3,
+      215.0
+    ],
+    "la_ga_pct": [
+      50.0,
+      85.00749625187406
+    ],
+    "drug_polymer_ratio": [
+      0.0005,
+      1.016191210485736
+    ],
+    "particle_size_um": [
+      1.153,
+      295.7
+    ],
+    "drug_loading_pct": [
+      0.0221782178217821,
+      42.9
+    ],
+    "encapsulation_efficiency_pct": [
+      1.31,
+      99.5
+    ],
+    "solubility_enhancer_conc_pct": [
+      0.0,
+      30.0
+    ],
+    "time_days": [
+      1.00002134365417,
+      237.732283464566
+    ]
+  },
+  "descriptor_oof_mae": 0.15530927715049045,
+  "assisted_oof_mae": 0.11933558750570404,
+  "eval_description": "Formulation-grouped 5-fold OOF on 212 formulations; does not test unseen publications.",
+  "input_description": {
+    "drug_mw": "g/mol",
+    "drug_tpsa": "angstrom^2",
+    "drug_logp": "unitless",
+    "polymer_mw_kda": "kDa",
+    "la_ga_pct": "lactide molar percent (50=50:50)",
+    "drug_polymer_ratio": "mass ratio (0.1=1:10)",
+    "particle_size_um": "micrometers",
+    "drug_loading_pct": "percent 0..100",
+    "encapsulation_efficiency_pct": "percent 0..100",
+    "solubility_enhancer_conc_pct": "source-encoded concentration (%)"
+  },
+  "training_environment": {
+    "lightgbm": "4.6.0",
+    "scikit_learn": "1.8.0"
+  },
+  "model_source": "First-day-assisted: exact export of original saved LightGBM Booster trained on 212 eligible Bao profiles. Descriptor-only: new LightGBM Booster trained using 316 Bao profiles (five excluded due to large cumulative-release decreases).",
+  "cv_cohort_selection": "Need >=2 measurements at distinct times through day1 and >=1 later; exclude cumulative drops >0.08.",
+  "assisted_reference_oof_mae_on_212": 0.11933558750570404,
+  "descriptor_reference_oof_mae_on_212": 0.1624362684488057,
+  "descriptor_oof_rmse": 0.21391305280592252,
+  "n_descriptor_formulations": 316,
+  "n_descriptor_measurements": 4078,
+  "n_assisted_formulations": 212,
+  "descriptor_oof_evaluation": "5-fold formulation-grouped, 316 profiles, 4078 after-day1 measurements; clipping and monotonic projection included.",
+  "assisted_oof_evaluation": "5-fold formulation-grouped, 212 profiles, 2704 after-day1 measurements; historical OOF without full curve projection.",
+  "assisted_training_numeric_ranges": {
+    "drug_mw": [
+      130.078,
+      1488.807000000001
+    ],
+    "drug_logp": [
+      -11.54519999999993,
+      9.113520000000005
+    ],
+    "drug_tpsa": [
+      6.48,
+      701.7700000000002
+    ],
+    "polymer_mw_kda": [
+      2.3,
+      215.0
+    ],
+    "la_ga_pct": [
+      50.0,
+      85.00749625187406
+    ],
+    "drug_polymer_ratio": [
+      0.0005,
+      1.016191210485736
+    ],
+    "particle_size_um": [
+      1.153,
+      295.7
+    ],
+    "drug_loading_pct": [
+      0.0221782178217821,
+      41.8
+    ],
+    "encapsulation_efficiency_pct": [
+      1.31,
+      99.5
+    ],
+    "solubility_enhancer_conc_pct": [
+      0.0,
+      30.0
+    ],
+    "kp_k": [
+      1.0315940073150005e-19,
+      1.3820328662799939
+    ],
+    "kp_n": [
+      0.01,
+      3.0
+    ],
+    "kp_r2": [
+      -53.402366863907474,
+      1.0
+    ],
+    "weibull_alpha": [
+      0.16251404348365778,
+      343.1216989743973
+    ],
+    "weibull_beta": [
+      0.13206803544967402,
+      3.08636867568237
+    ],
+    "weibull_r2": [
+      0.8363036912936145,
+      0.9999275505195379
+    ],
+    "release_0_25d": [
+      0.0020524296675188914,
+      0.7385625000000001
+    ],
+    "release_0_5d": [
+      0.0047563044215763505,
+      0.8338749999999996
+    ],
+    "release_1d": [
+      0.020064833445115,
+      0.6185
+    ],
+    "early_release_last": [
+      0.002969924066694,
+      0.938491452991453
+    ],
+    "early_time_last": [
+      0.0394736842105265,
+      1.0
+    ],
+    "time_days": [
+      1.00002134365417,
+      143.250714846668
+    ]
+  }
+}
