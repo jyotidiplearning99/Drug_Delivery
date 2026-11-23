@@ -85,7 +85,7 @@ def make_plot(curves, observations=None):
 
 
 def run_and_show(descriptors: pd.DataFrame, early_by_id: dict | None=None,
-                 obs_by_id: dict | None=None, observations_enabled=False):
+                 obs_by_id: dict | None=None, observations_enabled=False, ui_key: str='custom'):
     early_by_id = early_by_id or {}
     desc = validate_descriptors(descriptors)
     outside=out_of_range(desc)
@@ -115,10 +115,10 @@ def run_and_show(descriptors: pd.DataFrame, early_by_id: dict | None=None,
     c1,c2=st.columns(2)
     with c1:
         st.download_button('Download all predicted curves (CSV)',export.to_csv(index=False).encode('utf-8'),
-                           'bao_lightgbm_multi_curves.csv','text/csv',use_container_width=True)
+                           'bao_lightgbm_multi_curves.csv','text/csv',use_container_width=True, key=f'{ui_key}_curves_csv')
     with c2:
         st.download_button('Download input parameter sets (CSV)',desc.to_csv(index=False).encode('utf-8'),
-                           'bao_lightgbm_parameter_sets.csv','text/csv',use_container_width=True)
+                           'bao_lightgbm_parameter_sets.csv','text/csv',use_container_width=True, key=f'{ui_key}_parameters_csv')
     if horizon > META['training_numeric_ranges']['time_days'][1]:
         st.warning('Predictions beyond the largest descriptor-only training time are extrapolations. The first-day-assisted model has a shorter training horizon; long-range assisted forecasts also require caution.')
     st.caption('Predictions are clipped to 0–100% and adjusted to be nondecreasing; this is a model output constraint, not a calibrated uncertainty bound.')
@@ -214,7 +214,7 @@ with tab1:
             if unused:
                 st.warning('First-day measurements for unidentified formulations were not used: '
                            + ', '.join(sorted(unused)))
-        run_and_show(cleaned, early_by_id=early_map)
+        run_and_show(cleaned, early_by_id=early_map, ui_key='custom')
     except Exception as exc:
         st.error(f'Please correct the input parameters: {exc}')
 
@@ -241,12 +241,12 @@ with tab2:
         obs_by={str(fid):g[['time_days','release_fraction']].sort_values('time_days') for fid,g in profiles.groupby('formulation_id')}
         e_by={str(fid):g.loc[g.time_days.between(0,1),['time_days','release_fraction']].copy() for fid,g in profiles.groupby('formulation_id')} if use_early else {}
         try:
-            run_and_show(rows,early_by_id=e_by,obs_by_id=obs_by,observations_enabled=show_obs)
+            run_and_show(rows,early_by_id=e_by,obs_by_id=obs_by,observations_enabled=show_obs, ui_key='published')
             with st.expander('View reported descriptors for selected formulations'):
                 st.dataframe(rows,use_container_width=True,hide_index=True)
             st.download_button('Download selected observed release data',
                 profiles[['formulation_id','time_days','release_fraction']].to_csv(index=False).encode('utf8'),
-                'bao_selected_observed_release.csv','text/csv')
+                'bao_selected_observed_release.csv','text/csv',key='published_observations_csv')
         except Exception as exc:
             st.error(f'Unable to display selected formulations: {exc}')
     else:
@@ -263,12 +263,11 @@ with tab3:
 
 The **first-day model** was fitted on 212 qualifying formulations with 2,704 release measurements after day 1, requiring two distinct measured time points at or before day 1. The **descriptor-only model** was subsequently fitted on 316 Bao profiles, excluding five profiles with large decreases in reported cumulative release. **These two MAEs have different validation cohorts and postprocessing; they cannot establish that assisted prediction is more accurate from the displayed numbers alone.** A previous same-cohort comparison on 212 formulations did favor early signatures (0.1624 vs 0.1193), but it was not an external test.
 
-**Evaluation:** Five-fold grouped by formulation, not by publication or drug. These are exploratory development metrics; cross-formulation duplicates or shared studies may overstate generalization. The two reported MAEs use different subsets and are not directly comparable with the published LightGBM paper or the CatBoost app's study-held-out evaluation.
+**Evaluation:** Five-fold grouped by formulation, not by publication or drug. These are exploratory development metrics; cross-formulation duplicates or shared studies may overstate generalization. The two reported MAEs use different subsets and are not directly comparable with the published LightGBM paper.
 
 **Correct units:** Time in days; polymer MW in kDa; particle size in µm; LA:GA encoded as lactide percent (50 = 50:50); actual drug loading and encapsulation are percentages. The Bao variable *Solubility Enhancer Concentration* is not the same as *Surfactant %*. Training data has no measured temperature effect.
 
 **Limitations:** Not tested on completely unseen publications, not a validated design or clinical decision system, and release-medium or process differences may cause large errors. Formulation selection and completeness restrictions can introduce bias. Published profile overlays include data used in fitting; they do not validate prediction generalization. Drug loading and encapsulation efficiency must be known from formulation characterization.
 ''')
-    st.caption('The former CatBoost PLGA app is a separate research model and remains unaffected by this Bao-only LightGBM application.')
     st.download_button('Download Bao normalized release measurements (CSV)',data.to_csv(index=False).encode('utf8'),
                        'bao_release_measurements_321.csv','text/csv')
