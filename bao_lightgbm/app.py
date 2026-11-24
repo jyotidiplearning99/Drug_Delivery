@@ -1,273 +1,429 @@
-"""PLGA Release Studio | Bao-only LightGBM, multi-formulation interactive prototype."""
+"""PLGA Release Studio — Bao LightGBM, paper-aligned multi-formulation UI.
+
+Uses only the existing trained Bao models in models/. It neither retrains
+nor substitutes inputs from the 347-formulation Alabsi et al. (2026) study.
+"""
 from __future__ import annotations
+
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.colors import qualitative
 import streamlit as st
+
 from inference import (
     ROOT, META, FEATURES, LABELS, load_models, parse_early_csv,
     predict_curve, validate_descriptors, out_of_range,
 )
 
-st.set_page_config(page_title="PLGA Release Studio · Bao LightGBM", page_icon="🧪", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="PLGA Release Studio | Bao LightGBM",
+    page_icon="🧪",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 st.markdown("""
 <style>
-.block-container {max-width: 1350px; padding-top: 2rem;}
-h1 {letter-spacing:-.04em;}
-div[data-testid="stMetric"] {background:#f1f8fa; border-radius:12px; padding:12px 16px;}
+.block-container {max-width: 1320px; padding-top: 1.5rem; padding-bottom: 3rem;}
+h1 {letter-spacing: -.035em;}
+div[data-testid="stMetric"] {border: 1px solid #d5e0e7; border-radius: 10px; padding: 12px 14px;}
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_resource(show_spinner="Loading saved LightGBM models…")
+@st.cache_resource(show_spinner="Loading trained LightGBM models…")
 def cached_models():
     return load_models()
 
-@st.cache_data(show_spinner="Loading published Bao release profiles…")
+@st.cache_data(show_spinner="Loading experimental release data…")
 def source_data():
-    return pd.read_csv(ROOT / "data" / "published_profiles.csv", dtype={"formulation_id":str})
+    return pd.read_csv(ROOT / "data" / "published_profiles.csv", dtype={"formulation_id": str})
 
-models = cached_models()
-data = source_data()
+try:
+    models = cached_models()
+    data = source_data()
+except Exception as exc:
+    st.error("Could not load the Bao LightGBM models or source data. Verify the models/ and data/ folders in the deployed branch.")
+    st.exception(exc)
+    st.stop()
 
-st.title("PLGA Release Studio")
-st.caption("**Bao dataset · LightGBM edition**  |  Multiple formulations · cumulative release curves · experimental research prototype")
-st.info("**Two prediction modes:** formulation parameters only (descriptor-only LightGBM), or first-day-assisted LightGBM when actual measurements at two or more distinct times through day 1 are supplied. The assisted model must **not** be used without measured early-release data.", icon="ℹ️")
+# These groups mirror the experimental workflow in the 2026 PLGA paper.
+# Only the exact 10 descriptors accepted by the deployed Bao LightGBM models
+# are rendered as inputs. The 2026 paper contains other engineered features.
+GROUPS = [
+    ("Drug descriptors", ["drug_mw", "drug_logp", "drug_tpsa"]),
+    ("Polymer descriptors", ["polymer_mw_kda", "la_ga_pct"]),
+    ("Formulation descriptors", [
+        "drug_polymer_ratio", "particle_size_um", "drug_loading_pct",
+        "encapsulation_efficiency_pct", "solubility_enhancer_conc_pct",
+    ]),
+]
+FIELD_HELP = {
+    "drug_mw": "Drug molecular weight (g/mol). Use the correct molecular or salt form.",
+    "drug_logp": "Calculated LogP; negative values are possible.",
+    "drug_tpsa": "Topological polar surface area (Å²).",
+    "polymer_mw_kda": "Polymer molecular weight on the Bao dataset scale: kDa.",
+    "la_ga_pct": "Lactide percentage (50 means 50:50 PLGA). Do not enter '50:50'.",
+    "drug_polymer_ratio": "Initial drug-to-polymer mass ratio (0.1 means 1:10).",
+    "particle_size_um": "Measured particle size in micrometres (µm).",
+    "drug_loading_pct": "Measured drug loading capacity, percentage 0–100.",
+    "encapsulation_efficiency_pct": "Measured encapsulation efficiency, percentage 0–100.",
+    "solubility_enhancer_conc_pct": "Bao solubility-enhancer concentration, source percentage; not interchangeable with every surfactant measurement.",
+}
 
-m1,m2,m3,m4=st.columns(4)
-m1.metric("Source formulations",f'{META["n_all_formulations"]:,}')
-m2.metric("Measured release points",f'{META["n_all_measurements"]:,}')
-m3.metric("Descriptor-only CV MAE",f'{META["descriptor_oof_mae"]:.3f}')
-m4.metric("First-day CV MAE",f'{META["assisted_oof_mae"]:.3f}')
-st.caption("MAE in release fraction: descriptor-only **316** eligible Bao profiles, 5-fold MAE ~0.155; first-day-assisted **212** eligible profiles, 5-fold MAE ~0.119. **Different cohorts/projection rules: do not directly compare these MAEs.** Not publication-held-out testing.")
+st.title("🧪 PLGA Release Studio")
+st.caption("Bao dataset · LightGBM edition · Formulation-based prediction and first-day-assisted forecasting")
+st.warning(
+    "**Experimental research prototype.** Predictions are intended for research exploration, "
+    "not clinical decisions or manufacturing release. Models have no independent external validation."
+)
 
 with st.sidebar:
-    st.header("Plot options")
-    horizon = st.slider("Prediction horizon (days)", min_value=7, max_value=180, value=60, step=1)
-    target_day = st.slider("Inspect day", min_value=2, max_value=horizon, value=min(14,horizon))
-    n_grid = st.slider("Curve resolution",min_value=60,max_value=300,value=160,step=20)
-    show_band = st.checkbox("Show training horizon",value=True)
+    st.subheader("Prediction settings")
+    horizon = st.slider("Prediction horizon (days)", 7, 180, 60, 1, key="bao_horizon")
+    target_day = st.slider("Inspect release at day", 2, horizon, min(14, horizon), 1, key="bao_target_day")
+    n_grid = st.slider("Curve resolution", 60, 300, 160, 20, key="bao_curve_resolution")
+    show_observed_window = st.checkbox("Mark model training-time limit", value=True, key="bao_training_window")
     st.divider()
-    st.markdown("**Data provenance**")
-    st.caption("Bao et al., Mendeley Data v2 (CC BY 4.0). Release time is in **days**. Polymer Mw is **kDa**. LA:GA entered as **lactide %**. Loading and encapsulation entered as percentages.")
-    st.markdown("[Original Bao dataset](https://data.mendeley.com/datasets/zzvtdrcy76/2)")
+    st.subheader("Model information")
+    st.write("**Dataset:** Bao et al. (2025), 321 PLGA formulations")
+    st.write("**Model:** LightGBM, cumulative release after day 1")
+    st.metric("Descriptor-only CV MAE", f"{META['descriptor_oof_mae']:.3f}")
+    st.metric("First-day-assisted CV MAE", f"{META['assisted_oof_mae']:.3f}")
+    st.caption("Different validation cohorts; MAEs are not directly comparable.")
+    st.markdown("[Bao original dataset](https://data.mendeley.com/datasets/zzvtdrcy76/2)")
 
 
-def grid_days(horizon, n):
-    return np.linspace(1.01, float(horizon), int(n))
+def make_time_grid():
+    return np.linspace(1.01, float(horizon), int(n_grid))
 
 
-def make_plot(curves, observations=None):
+def prepare_early_map(early_edit: pd.DataFrame, valid_ids: list[str]):
+    """Never invent or auto-fill early measurements."""
+    if early_edit is None or early_edit.empty:
+        return {}
+    clean = parse_early_csv(early_edit)
+    groups = {str(name): g for name, g in clean.groupby("formulation_id")}
+    unused = sorted(set(groups) - set(valid_ids))
+    if unused:
+        st.warning("Early measurements ignored for unknown formulation names: " + ", ".join(unused[:10]))
+    return {name: g for name, g in groups.items() if name in valid_ids}
+
+
+def render_predictions(
+    descriptors: pd.DataFrame,
+    *,
+    early_by_id: dict | None = None,
+    observations: dict | None = None,
+    show_observations: bool = False,
+    widget_prefix: str,
+):
+    """Render identical outputs for custom and published tabs, with unique keys."""
+    desc = validate_descriptors(descriptors)
+    early_by_id = early_by_id or {}
+    numeric_warnings = out_of_range(desc)
+    if numeric_warnings:
+        examples = "; ".join(f"{name}: {', '.join(fields)}" for name, fields in numeric_warnings[:5])
+        st.warning("Outside observed training descriptor range (extrapolation): " + examples)
+
+    time_grid = make_time_grid()
+    curves = []
+    summaries = []
     fig = go.Figure()
     colors = qualitative.Plotly + qualitative.Safe + qualitative.D3
-    for i, (name, frame) in enumerate(curves.items()):
-        color=colors[i % len(colors)]
-        fig.add_trace(go.Scatter(x=frame.time_days, y=frame.release_percent,
-                                 mode="lines", name=f"{name} · {frame.model.iloc[0].replace('_',' ')}",
-                                 line=dict(width=2.8,color=color)))
-        if observations is not None and name in observations and observations[name] is not None:
-            obs=observations[name]
-            fig.add_trace(go.Scatter(x=obs.time_days, y=obs.release_fraction*100,
-                                     mode="markers", name=f"{name} · observed",legendgroup=name,
-                                     marker=dict(symbol="circle-open", size=6, color=color),opacity=.8))
-    if show_band and horizon > float(META['training_numeric_ranges']['time_days'][1]):
-        daymax=float(META['training_numeric_ranges']['time_days'][1])
-        fig.add_vrect(x0=daymax, x1=horizon, fillcolor="orange", opacity=.08, line_width=0,
-                      annotation_text="Beyond training range",annotation_position="top left")
-    fig.add_vline(x=1, line_dash="dot",line_color="#88909b")
-    fig.add_vline(x=target_day, line_dash="dash",line_color="#64748b",opacity=.65)
-    fig.update_layout(template="plotly_white",height=505,margin=dict(l=10,r=10,t=20,b=10),
-                      xaxis_title="Time (days)",yaxis_title="Cumulative drug release (%)",
-                      xaxis=dict(range=[0,horizon]),yaxis=dict(range=[0,102]),
-                      legend=dict(orientation="h",y=-.23),hovermode="x unified")
-    return fig
+    used_assisted = 0
+    for idx, record in enumerate(desc.to_dict("records")):
+        name = str(record["formulation_id"])
+        y, mode = predict_curve(models, record, time_grid, early_by_id.get(name))
+        if mode == "first_day_assisted":
+            used_assisted += 1
+        frame = pd.DataFrame({
+            "formulation_id": name,
+            "time_days": time_grid,
+            "release_percent": y * 100.0,
+            "prediction_mode": mode,
+        })
+        curves.append(frame)
+        color = colors[idx % len(colors)]
+        fig.add_trace(go.Scatter(
+            x=time_grid, y=y * 100.0, mode="lines", name=name,
+            line={"width": 3, "color": color},
+            hovertemplate="Day %{x:.1f}<br>Predicted release %{y:.1f}%<extra>" + name + "</extra>",
+        ))
+        if show_observations and observations and name in observations:
+            g = observations[name]
+            fig.add_trace(go.Scatter(
+                x=g["time_days"], y=g["release_fraction"] * 100.0,
+                mode="markers", name=f"{name} · experimental",
+                marker={"size": 7, "color": color, "symbol": "circle-open"},
+                hovertemplate="Day %{x:.1f}<br>Measured release %{y:.1f}%<extra></extra>",
+            ))
+        summaries.append({
+            "Formulation": name,
+            "Mode": "First-day assisted" if mode == "first_day_assisted" else "Descriptors only",
+            f"Day {target_day} release (%)": round(float(np.interp(target_day, time_grid, y) * 100.0), 2),
+            f"Day {horizon} release (%)": round(float(y[-1] * 100.0), 2),
+        })
+
+    if show_observed_window:
+        tmax = float(META["training_numeric_ranges"]["time_days"][1])
+        if horizon > tmax:
+            fig.add_vrect(
+                x0=tmax, x1=horizon, fillcolor="orange", opacity=.07,
+                line_width=0, annotation_text="Beyond training time",
+            )
+    fig.add_vline(x=1, line_dash="dot", line_color="#9ca3af")
+    fig.add_vline(x=target_day, line_dash="dash", line_color="#64748b", opacity=.6)
+    fig.update_layout(
+        title="Predicted cumulative drug-release profiles",
+        template="plotly_white", height=510,
+        xaxis={"title": "Time (days)", "range": [0, horizon]},
+        yaxis={"title": "Cumulative drug release (%)", "range": [0, 102]},
+        legend={"orientation": "h", "y": -0.22},
+        margin={"l": 10, "r": 10, "b": 15, "t": 55},
+        hovermode="x unified",
+    )
+    st.plotly_chart(fig, use_container_width=True, key=f"{widget_prefix}_release_plot")
+    if early_by_id:
+        st.caption(f"{used_assisted} of {len(desc)} profile(s) used actual first-day measurements; "
+                   "profiles with fewer than two distinct early time points use descriptor-only LightGBM.")
+    st.dataframe(pd.DataFrame(summaries), hide_index=True, use_container_width=True)
+
+    all_predictions = pd.concat(curves, ignore_index=True)
+    left, right = st.columns(2)
+    with left:
+        st.download_button(
+            "Download predicted release curves (CSV)",
+            all_predictions.to_csv(index=False).encode("utf-8"),
+            file_name="bao_lightgbm_predicted_profiles.csv", mime="text/csv",
+            key=f"{widget_prefix}_predictions_csv", use_container_width=True,
+        )
+    with right:
+        st.download_button(
+            "Download formulation inputs (CSV)",
+            desc.to_csv(index=False).encode("utf-8"),
+            file_name="bao_lightgbm_formulation_parameters.csv", mime="text/csv",
+            key=f"{widget_prefix}_parameters_csv", use_container_width=True,
+        )
+    if horizon > float(META["training_numeric_ranges"]["time_days"][1]):
+        st.warning("The selected horizon extends beyond the descriptor-only training time range; the model is extrapolating.")
+    st.caption("Predicted values are bounded to 0–100% and forced to be nondecreasing. "
+               "This does not provide a confidence interval or validate biological accuracy.")
 
 
-def run_and_show(descriptors: pd.DataFrame, early_by_id: dict | None=None,
-                 obs_by_id: dict | None=None, observations_enabled=False, ui_key: str='custom'):
-    early_by_id = early_by_id or {}
-    desc = validate_descriptors(descriptors)
-    outside=out_of_range(desc)
-    if outside:
-        msg="; ".join(f"{name}: {', '.join(feats)}" for name,feats in outside[:6])
-        st.warning(f"Some inputs are outside the training range (extrapolation): {msg}")
-    days=grid_days(horizon,n_grid)
-    curves={};long=[]; summaries=[]; assisted_count=0
-    for record in desc.to_dict('records'):
-        name=record['formulation_id']
-        early=early_by_id.get(name)
-        y,mode=predict_curve(models, record, days, early)
-        if mode == 'first_day_assisted': assisted_count+=1
-        frame=pd.DataFrame({'formulation_id':name,'time_days':days,
-                            'release_percent':y*100,'model':mode})
-        curves[name]=frame
-        long.append(frame)
-        summaries.append({'Formulation':name,'Prediction mode':'First-day assisted' if mode=='first_day_assisted' else 'Descriptors only',
-                          f'At day {target_day} (%)':round(float(np.interp(target_day,days,y)*100),2),
-                          f'At day {horizon} (%)':round(float(y[-1]*100),2)})
-    fig=make_plot(curves, observations=obs_by_id if observations_enabled else None)
-    st.plotly_chart(fig,use_container_width=True)
-    if early_by_id and assisted_count < len(desc):
-        st.caption(f"{assisted_count}/{len(desc)} curves used first-day-assisted LightGBM. The remainder used descriptor-only LightGBM because two valid early measurements were unavailable.")
-    st.dataframe(pd.DataFrame(summaries),hide_index=True,use_container_width=True)
-    export=pd.concat(long,ignore_index=True)
-    c1,c2=st.columns(2)
-    with c1:
-        st.download_button('Download all predicted curves (CSV)',export.to_csv(index=False).encode('utf-8'),
-                           'bao_lightgbm_multi_curves.csv','text/csv',use_container_width=True, key=f'{ui_key}_curves_csv')
-    with c2:
-        st.download_button('Download input parameter sets (CSV)',desc.to_csv(index=False).encode('utf-8'),
-                           'bao_lightgbm_parameter_sets.csv','text/csv',use_container_width=True, key=f'{ui_key}_parameters_csv')
-    if horizon > META['training_numeric_ranges']['time_days'][1]:
-        st.warning('Predictions beyond the largest descriptor-only training time are extrapolations. The first-day-assisted model has a shorter training horizon; long-range assisted forecasts also require caution.')
-    st.caption('Predictions are clipped to 0–100% and adjusted to be nondecreasing; this is a model output constraint, not a calibrated uncertainty bound.')
+published = data.drop_duplicates("formulation_id").dropna(subset=FEATURES).reset_index(drop=True)
+if published.empty:
+    st.error("No valid published formulation rows were found.")
+    st.stop()
 
+# Keep three concise tabs. The primary tab intentionally mirrors the first PLGA Studio.
+tab_predict, tab_published, tab_about = st.tabs([
+    "🧪 Predict formulations", "📈 Compare experimental profiles", "ℹ️ About",
+])
 
-tab1,tab2,tab3=st.tabs(['🧬 Compare custom formulations','📈 Explore published release profiles','ℹ️ Model & dataset'])
+with tab_predict:
+    st.subheader("Describe your PLGA formulations")
+    st.caption("Change the individual numerical fields, then click **Predict release profiles**. "
+               "Each formulation is drawn as a separate curve on the same graph.")
+    entry_mode = st.radio(
+        "Input method", ["Manual fields", "Spreadsheet / CSV"],
+        horizontal=True, key="bao_entry_mode_paper_ui",
+    )
+    valid_payload = st.session_state.get("bao_custom_prediction_payload")
 
-with tab1:
-    st.subheader('Compare your own PLGA formulations')
-    st.caption('Enter parameters directly as individual numeric fields, just like the existing PLGA Studio. Each formulation produces its own release curve on the shared graph.')
-
-    # Every starting value comes from a published Bao descriptor row, and remains editable.
-    seed_rows=(data.drop_duplicates('formulation_id')
-               .dropna(subset=FEATURES)
-               .reset_index(drop=True))
-    defaults=seed_rows.head(3)[FEATURES].copy().reset_index(drop=True)
-    defaults.insert(0,'formulation_id',[f'Formulation {i+1}' for i in range(len(defaults))])
-    template=defaults.head(0).copy()
-
-    entry_mode=st.radio('How would you like to enter your formulations?',
-                        options=['Manual parameter fields', 'Spreadsheet / CSV (advanced)'],
-                        horizontal=True, key='bao_entry_mode')
-
-    if entry_mode == 'Manual parameter fields':
-        count=int(st.number_input('Number of formulations to compare',
-                                  min_value=1, max_value=25, value=2, step=1,
-                                  help='Choose up to 25 parameter sets; each becomes a separate predicted curve.'))
-        st.caption('Change any number below. All 10 model input parameters are editable, with units shown in the labels. Expand each formulation to edit it.')
-        groups=[
-            ('Drug properties', ['drug_mw','drug_logp','drug_tpsa']),
-            ('Polymer properties', ['polymer_mw_kda','la_ga_pct']),
-            ('Formulation properties', ['drug_polymer_ratio','particle_size_um',
-                                        'drug_loading_pct','encapsulation_efficiency_pct',
-                                        'solubility_enhancer_conc_pct']),
-        ]
-        manual_records=[]
-        for i in range(count):
-            seed=seed_rows.iloc[i % len(seed_rows)]
-            with st.expander(f'Formulation {i+1} — editable parameters', expanded=(i < 2)):
-                name=st.text_input('Formulation name / ID', value=f'Formulation {i+1}',
-                                   key=f'bao_manual_formulation_name_{i}')
-                record={'formulation_id':name}
-                for group_name, fields in groups:
-                    st.markdown('**'+group_name+'**')
-                    cols=st.columns(3)
-                    for j, feature in enumerate(fields):
-                        with cols[j % 3]:
-                            record[feature]=float(st.number_input(
-                                LABELS[feature], value=float(seed[feature]), step=0.1,
-                                format='%.4f', key=f'bao_manual_{i}_{feature}'))
-                manual_records.append(record)
-        edited=pd.DataFrame(manual_records, columns=['formulation_id']+FEATURES)
-        st.caption('These are editable demonstration inputs, not recommendations. Values outside the model training ranges trigger a warning below.')
-    else:
-        st.write('Edit the table directly or upload your own parameter sets. One row gives one predicted curve.')
-        up=st.file_uploader('Optional: upload parameter sets CSV', type=['csv'],
-                            key='custom_parameters')
-        if up is not None:
+    if entry_mode == "Manual fields":
+        n_forms = int(st.number_input(
+            "Number of formulations", min_value=1, max_value=25, value=2, step=1,
+            help="Up to 25 formulations can be predicted and compared together.",
+            key="bao_number_of_formulations",
+        ))
+        st.info("Only properties used by this trained Bao LightGBM model are shown. "
+                "The 2026 PLGA paper included additional descriptors and engineered features.")
+        with st.form("bao_manual_form", clear_on_submit=False, border=True):
+            records = []
+            for i in range(n_forms):
+                example = published.iloc[i % len(published)]
+                with st.expander(f"Formulation {i + 1}", expanded=(i == 0)):
+                    name = st.text_input(
+                        "Formulation name (curve legend)",
+                        value=f"Formulation {i + 1}", key=f"bao_v4_name_{i}",
+                    )
+                    record = {"formulation_id": name}
+                    for group_name, field_names in GROUPS:
+                        st.markdown(f"**{group_name}**")
+                        columns = st.columns(3)
+                        for j, feature in enumerate(field_names):
+                            with columns[j % 3]:
+                                step = 1.0 if feature in {"drug_mw", "polymer_mw_kda", "particle_size_um"} else 0.1
+                                record[feature] = float(st.number_input(
+                                    LABELS[feature],
+                                    value=float(example[feature]),
+                                    step=step, format="%.4f",
+                                    help=FIELD_HELP.get(feature),
+                                    key=f"bao_v4_{i}_{feature}",
+                                ))
+                    records.append(record)
+            with st.expander("Optional: measured release during the first 24 hours", expanded=False):
+                st.caption(
+                    "Enter **actual measured** release data, not model predictions. "
+                    "At least two distinct observation times between day 0 and day 1 are required "
+                    "to activate first-day-assisted LightGBM for a formulation. "
+                    "Use the exact formulation name from above; otherwise leave this table blank."
+                )
+                early_manual = st.data_editor(
+                    pd.DataFrame(columns=["formulation_id", "time_days", "release_percent"]),
+                    num_rows="dynamic", hide_index=True, use_container_width=True,
+                    key="bao_v4_early_manual_table",
+                    column_config={
+                        "formulation_id": st.column_config.TextColumn("Formulation name"),
+                        "time_days": st.column_config.NumberColumn("Time (days)", format="%.3f"),
+                        "release_percent": st.column_config.NumberColumn("Measured release (%)", format="%.2f"),
+                    },
+                )
+            submitted_manual = st.form_submit_button(
+                "Predict release profiles", type="primary", use_container_width=True,
+            )
+        if submitted_manual:
             try:
-                param_rows=pd.read_csv(up)
+                desc = validate_descriptors(pd.DataFrame(records, columns=["formulation_id"] + FEATURES))
+                e_map = prepare_early_map(early_manual, desc.formulation_id.tolist())
+                st.session_state["bao_custom_prediction_payload"] = {
+                    "descriptors": desc, "early_by_id": e_map, "source": "manual",
+                }
+                valid_payload = st.session_state["bao_custom_prediction_payload"]
             except Exception as exc:
-                st.error(f'Could not read parameter CSV: {exc}')
-                param_rows=defaults
-        else:
-            param_rows=defaults
-        st.download_button('Download blank input CSV template',
-                           template.to_csv(index=False).encode('utf8'),
-                           file_name='bao_lightgbm_input_template.csv', mime='text/csv')
-        edited=st.data_editor(param_rows, num_rows='dynamic', use_container_width=True,
-                              hide_index=True,
-                              column_config={
-                                  'formulation_id':st.column_config.TextColumn('Formulation name / ID'),
-                                  **{f:st.column_config.NumberColumn(LABELS[f], format='%.4f')
-                                     for f in FEATURES}
-                              }, key='parameter_editor')
+                st.error(f"Correct the formulation inputs: {exc}")
 
-    with st.expander('Optional: add measured first-day release points for assisted prediction'):
-        st.caption('Use actual laboratory measurements only. At least two distinct measurement times between day 0 and day 1 are required. Leave empty for descriptor-only LightGBM prediction.')
-        early_blank=pd.DataFrame(columns=['formulation_id','time_days','release_percent'])
-        early_edit=st.data_editor(early_blank, num_rows='dynamic',
-                                  use_container_width=True, hide_index=True,
-                                  key='early_editor')
-        st.download_button('Download early-measurement CSV template',
-                           early_blank.to_csv(index=False).encode('utf8'),
-                           'bao_first_day_measurements_template.csv','text/csv')
-    try:
-        cleaned=edited.dropna(subset=['formulation_id']).copy()
-        early_map={}
-        if len(early_edit):
-            early_clean=parse_early_csv(early_edit)
-            early_map={str(k):v for k,v in early_clean.groupby('formulation_id')}
-            unused=set(early_map)-set(cleaned.formulation_id.astype(str))
-            if unused:
-                st.warning('First-day measurements for unidentified formulations were not used: '
-                           + ', '.join(sorted(unused)))
-        run_and_show(cleaned, early_by_id=early_map, ui_key='custom')
-    except Exception as exc:
-        st.error(f'Please correct the input parameters: {exc}')
-
-with tab2:
-    st.subheader('Compare measured Bao profiles and model forecasts')
-    st.caption('Select up to 15 real formulations. Their measured release points can be overlaid with the trained-model curves. These curves were included in model development and are **not independent test results**.')
-    selection=data.drop_duplicates('formulation_id')
-    all_ids=selection['formulation_id'].astype(str).tolist()
-    # Prefer first three known eligible formulations with two distinct early timepoints and followup.
-    d0=[]
-    for fid,g in data.groupby('formulation_id',sort=False):
-        if g.loc[g.time_days.between(0,1),'time_days'].nunique() >= 2 and (g.time_days>1).any():
-            d0.append(str(fid))
-        if len(d0)==3:break
-    ids=st.multiselect('Choose published formulation IDs',options=all_ids,default=d0,max_selections=15)
-    if ids:
-        c1,c2=st.columns(2)
-        with c1:
-            show_obs=st.toggle('Overlay actual recorded release points',value=True)
-        with c2:
-            use_early=st.toggle('Use measured first-day data when eligible',value=True)
-        profiles=data.loc[data.formulation_id.astype(str).isin(ids)].copy()
-        rows=profiles.drop_duplicates('formulation_id')[['formulation_id']+FEATURES].copy()
-        obs_by={str(fid):g[['time_days','release_fraction']].sort_values('time_days') for fid,g in profiles.groupby('formulation_id')}
-        e_by={str(fid):g.loc[g.time_days.between(0,1),['time_days','release_fraction']].copy() for fid,g in profiles.groupby('formulation_id')} if use_early else {}
-        try:
-            run_and_show(rows,early_by_id=e_by,obs_by_id=obs_by,observations_enabled=show_obs, ui_key='published')
-            with st.expander('View reported descriptors for selected formulations'):
-                st.dataframe(rows,use_container_width=True,hide_index=True)
-            st.download_button('Download selected observed release data',
-                profiles[['formulation_id','time_days','release_fraction']].to_csv(index=False).encode('utf8'),
-                'bao_selected_observed_release.csv','text/csv',key='published_observations_csv')
-        except Exception as exc:
-            st.error(f'Unable to display selected formulations: {exc}')
     else:
-        st.info('Select at least one formulation to display curves.')
+        st.caption("Advanced entry: one formulation per row; CSV columns must match the model inputs.")
+        initial = published.head(2)[FEATURES].copy().reset_index(drop=True)
+        initial.insert(0, "formulation_id", ["Formulation 1", "Formulation 2"])
+        blank = initial.head(0)
+        st.download_button(
+            "Download parameter template (CSV)", blank.to_csv(index=False).encode("utf-8"),
+            "bao_parameter_template.csv", "text/csv", key="bao_v4_blank_template",
+        )
+        uploaded = st.file_uploader("Upload parameter sets (optional)", type=["csv"], key="bao_v4_uploaded_csv")
+        try:
+            table_source = pd.read_csv(uploaded) if uploaded is not None else initial
+        except Exception as exc:
+            st.error(f"Could not load CSV: {exc}")
+            table_source = initial
+        with st.form("bao_spreadsheet_form", clear_on_submit=False):
+            edited = st.data_editor(
+                table_source, num_rows="dynamic", hide_index=True, use_container_width=True,
+                key="bao_v4_spreadsheet",
+                column_config={
+                    "formulation_id": st.column_config.TextColumn("Formulation name"),
+                    **{feature: st.column_config.NumberColumn(LABELS[feature], format="%.4f")
+                       for feature in FEATURES},
+                },
+            )
+            st.caption("First-day release measurements can be entered below, if actually measured.")
+            early_bulk = st.data_editor(
+                pd.DataFrame(columns=["formulation_id", "time_days", "release_percent"]),
+                num_rows="dynamic", hide_index=True, use_container_width=True,
+                key="bao_v4_early_bulk",
+            )
+            submitted_bulk = st.form_submit_button("Predict release profiles", type="primary")
+        if submitted_bulk:
+            try:
+                desc = validate_descriptors(edited)
+                e_map = prepare_early_map(early_bulk, desc.formulation_id.tolist())
+                st.session_state["bao_custom_prediction_payload"] = {
+                    "descriptors": desc, "early_by_id": e_map, "source": "spreadsheet",
+                }
+                valid_payload = st.session_state["bao_custom_prediction_payload"]
+            except Exception as exc:
+                st.error(f"Correct the table or early-release entries: {exc}")
 
-with tab3:
-    st.subheader('About the LightGBM models')
-    st.markdown('''
-**Dataset:** Bao et al., *A dataset on formulation parameters and characteristics of drug-loaded PLGA microparticles*, Mendeley Data v2, DOI [10.17632/zzvtdrcy76.2](https://data.mendeley.com/datasets/zzvtdrcy76/2), **CC BY 4.0**.
+    if valid_payload is None:
+        st.info("Enter your formulation parameters and click **Predict release profiles** to see the graph.")
+    else:
+        st.divider()
+        st.subheader("Predicted cumulative drug release")
+        st.caption("Showing the most recently submitted parameter set. Submit again after changing the inputs.")
+        try:
+            render_predictions(
+                valid_payload["descriptors"], early_by_id=valid_payload["early_by_id"],
+                widget_prefix="bao_custom",
+            )
+        except Exception as exc:
+            st.error(f"Prediction failed: {exc}")
 
-**Descriptor-only model:** uses numerical drug and formulation properties plus time, without early measured release data. Trained on **316 formulations** with 4,078 release measurements after day 1. Five-fold formulation-grouped, monotone-projected out-of-fold MAE **0.1553**.
+with tab_published:
+    st.subheader("Compare published Bao release profiles")
+    st.caption("Compare observed experimental points against model predictions. These records contributed "
+               "to model development and do **not** provide an independent validation set.")
+    all_ids = published["formulation_id"].astype(str).tolist()
+    examples = []
+    for fid, group in data.groupby("formulation_id", sort=False):
+        early = group.loc[group.time_days.between(0, 1), "time_days"]
+        if early.nunique() >= 2 and (group.time_days > 1).any():
+            examples.append(str(fid))
+        if len(examples) == 3:
+            break
+    selection = st.multiselect(
+        "Select published formulation IDs", all_ids, default=examples,
+        max_selections=15, key="bao_v4_published_ids",
+    )
+    if selection:
+        left, right = st.columns(2)
+        with left:
+            overlay = st.checkbox("Overlay measured experimental points", value=True, key="bao_v4_observed")
+        with right:
+            assisted = st.checkbox("Use available measured first-day observations", value=True, key="bao_v4_assisted")
+        chosen = data[data.formulation_id.astype(str).isin(selection)].copy()
+        rows = chosen.drop_duplicates("formulation_id")[["formulation_id"] + FEATURES].copy()
+        obs_map = {str(fid): g[["time_days", "release_fraction"]].sort_values("time_days")
+                   for fid, g in chosen.groupby("formulation_id")}
+        first_map = {
+            str(fid): g.loc[g.time_days.between(0, 1), ["time_days", "release_fraction"]].copy()
+            for fid, g in chosen.groupby("formulation_id")
+        } if assisted else {}
+        try:
+            render_predictions(
+                rows, early_by_id=first_map, observations=obs_map,
+                show_observations=overlay, widget_prefix="bao_published",
+            )
+            with st.expander("Published formulation descriptors"):
+                st.dataframe(rows, hide_index=True, use_container_width=True)
+            st.download_button(
+                "Download selected measured release points (CSV)",
+                chosen[["formulation_id", "time_days", "release_fraction"]].to_csv(index=False).encode("utf-8"),
+                "bao_selected_experimental_release.csv", "text/csv",
+                key="bao_v4_measured_csv",
+            )
+        except Exception as exc:
+            st.error(f"Unable to display selected formulations: {exc}")
+    else:
+        st.info("Select at least one formulation.")
 
-**First-day-assisted model:** uses the same descriptors plus kinetic/early-release signatures calculated **only from measured data at or before day 1**. It forecasts later values; out-of-fold MAE is **0.1193**.
-
-The **first-day model** was fitted on 212 qualifying formulations with 2,704 release measurements after day 1, requiring two distinct measured time points at or before day 1. The **descriptor-only model** was subsequently fitted on 316 Bao profiles, excluding five profiles with large decreases in reported cumulative release. **These two MAEs have different validation cohorts and postprocessing; they cannot establish that assisted prediction is more accurate from the displayed numbers alone.** A previous same-cohort comparison on 212 formulations did favor early signatures (0.1624 vs 0.1193), but it was not an external test.
-
-**Evaluation:** Five-fold grouped by formulation, not by publication or drug. These are exploratory development metrics; cross-formulation duplicates or shared studies may overstate generalization. The two reported MAEs use different subsets and are not directly comparable with the published LightGBM paper.
-
-**Correct units:** Time in days; polymer MW in kDa; particle size in µm; LA:GA encoded as lactide percent (50 = 50:50); actual drug loading and encapsulation are percentages. The Bao variable *Solubility Enhancer Concentration* is not the same as *Surfactant %*. Training data has no measured temperature effect.
-
-**Limitations:** Not tested on completely unseen publications, not a validated design or clinical decision system, and release-medium or process differences may cause large errors. Formulation selection and completeness restrictions can introduce bias. Published profile overlays include data used in fitting; they do not validate prediction generalization. Drug loading and encapsulation efficiency must be known from formulation characterization.
-''')
-    st.download_button('Download Bao normalized release measurements (CSV)',data.to_csv(index=False).encode('utf8'),
-                       'bao_release_measurements_321.csv','text/csv')
+with tab_about:
+    st.subheader("Dataset and prediction method")
+    st.markdown(
+        "**Source:** Bao et al. (2025), *A dataset on formulation parameters and characteristics of "
+        "drug-loaded PLGA microparticles*. [Mendeley Data v2](https://data.mendeley.com/datasets/zzvtdrcy76/2) "
+        "(CC BY 4.0)."
+    )
+    st.markdown(
+        "**Models:** Descriptor-only LightGBM uses formulation properties and time. "
+        "First-day-assisted LightGBM additionally uses actual release observations from day 0–1. "
+        "Both forecast cumulative release after day 1."
+    )
+    st.markdown(
+        f"**Internal validation:** Descriptor-only MAE **{META['descriptor_oof_mae']:.4f}** "
+        f"(316 formulations); assisted MAE **{META['assisted_oof_mae']:.4f}** "
+        "(212 formulations). Different cohorts; not directly comparable. "
+        "Neither result establishes validation on unseen publications."
+    )
+    st.caption(
+        "The interface follows the experimental input → first-day information → long-term prediction "
+        "workflow described by Alabsi et al. (2026), but it is not a reproduction of that paper's "
+        "347-formulation dataset, model feature set, or reported performance."
+    )
+    st.download_button(
+        "Download normalized Bao release dataset (CSV)",
+        data.to_csv(index=False).encode("utf-8"),
+        "bao_release_measurements_321.csv", "text/csv", key="bao_v4_full_dataset_csv",
+    )
